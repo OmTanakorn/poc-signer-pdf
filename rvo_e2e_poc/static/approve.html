@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWC RVO – Approve</title>
+    <script src="/lib/webviewer.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: sans-serif; background: #f4f4f9; }
+        .header {
+            padding: 12px 20px;
+            background: #002b49;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .header h2 { font-size: 18px; flex: 1; }
+        button {
+            padding: 8px 18px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-gen     { background: #ffc107; color: #000; }
+        .btn-gen:hover:not(:disabled)     { background: #e0a800; }
+        .btn-save    { background: #00b140; color: #fff; }
+        .btn-save:hover:not(:disabled)    { background: #008a32; }
+        .btn-approve { background: #0d6efd; color: #fff; }
+        .btn-approve:hover:not(:disabled) { background: #0a58ca; }
+        .btn-approved { background: #6c757d; color: #fff; cursor: default; }
+        #status { font-size: 13px; color: #cce; min-width: 220px; }
+        #viewer { width: 100%; height: calc(100vh - 56px); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>RVO Approve Flow (v2)</h2>
+        <span id="status">Click "Generate PDF" to start</span>
+        <button class="btn-gen"     id="gen-btn"     onclick="generatePDF()">1. Generate New PDF</button>
+        <button class="btn-save"    id="save-btn"    disabled onclick="saveSignature()">2. Save Signature</button>
+        <button class="btn-approve" id="approve-btn" disabled onclick="approvePDF()">3. Approve</button>
+    </div>
+    <div id="viewer"></div>
+
+    <script>
+        let annotationManager = null;
+        let instance = null;
+        let pendingApprove = false;
+
+        // ─── 1. Generate PDF ─────────────────────────────────────────────
+        async function generatePDF() {
+            const btn = document.getElementById('gen-btn');
+            const status = document.getElementById('status');
+            btn.disabled = true;
+            status.textContent = "⏳ Generating PDF...";
+
+            const res = await fetch('/api/generate-pdf', { method: 'POST' });
+            if (!res.ok) {
+                status.textContent = "❌ Generation failed!";
+                btn.disabled = false;
+                return;
+            }
+            status.textContent = "✅ PDF ready. Loading viewer...";
+            btn.disabled = false;
+            initViewer();
+        }
+
+        // ─── 2. Init Viewer ───────────────────────────────────────────────
+        function initViewer() {
+            document.getElementById('viewer').innerHTML = "";
+
+            WebViewer({ path: '/lib/public', initialDoc: '/api/document' }, 
+                document.getElementById('viewer')
+            ).then(async inst => {
+                instance = inst;
+                const { documentViewer, annotationManager: am, Annotations } = inst.Core;
+                annotationManager = am;
+
+                // ── Listen for signature placed (v11: use fieldChanged) ─────
+                annotationManager.addEventListener('fieldChanged', async (field, value) => {
+                    if (pendingApprove && field.name === 'Executive_Signature') {
+                        pendingApprove = false;
+                        console.log('[Approve] ✅ Field signed — auto-saving & approving...');
+                        await saveSignature();
+                        await submitApproval();
+                    }
+                });
+
+                documentViewer.addEventListener('documentLoaded', async () => {
+                    const status = document.getElementById('status');
+                    status.textContent = "⏳ Loading annotations...";
+                    try {
+                        const res = await fetch('/api/xfdf');
+                        const data = await res.json();
+                        if (data.xfdf_payload) {
+                            await annotationManager.importAnnotations(data.xfdf_payload);
+                            status.textContent = "✅ Signature already loaded";
+                        } else {
+                            status.textContent = "📝 Ready — กด Approve เพื่ออนุมัติ";
+                        }
+                    } catch (err) {
+                        status.textContent = "⚠️ " + err.message;
+                    }
+                    document.getElementById('save-btn').disabled    = false;
+                    document.getElementById('approve-btn').disabled = false;
+                });
+            });
+        }
+
+        // ─── 3. Save XFDF ────────────────────────────────────────────────
+        async function saveSignature() {
+            if (!annotationManager) return;
+            const xfdfString = await annotationManager.exportAnnotations();
+            await fetch('/api/xfdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ xfdf_payload: xfdfString })
+            });
+            document.getElementById('status').textContent = "💾 Signature saved";
+        }
+
+        // ─── 4. Approve ──────────────────────────────────────────────────
+        async function approvePDF() {
+            if (!annotationManager) return;
+            const status = document.getElementById('status');
+
+            // ตรวจสอบว่าเซ็นแล้วหรือยัง
+            // ใช้ annotation list แทน field.getValue() เพื่อป้องกัน false-positive
+            const allAnnots = annotationManager.getAnnotationsList();
+            const alreadySigned = allAnnots.some(a => {
+                const name = a.constructor?.name ?? '';
+                return name.includes('Signature') && !name.includes('Widget');
+            });
+            console.log('[Approve] Annotations:', allAnnots.map(a => a.constructor?.name));
+            console.log('[Approve] Already signed?', alreadySigned);
+
+            if (alreadySigned) {
+                console.log('[Approve] Already signed — submitting approval directly');
+                await submitApproval();
+                return;
+            }
+
+            // ยังไม่เซ็น — trigger signature dialog อัตโนมัติ
+            status.textContent = "🖊️ กรุณาเซ็นชื่อเพื่อ Approve...";
+            pendingApprove = true;
+
+            // หา widget จาก fieldManager (ไม่ต้องใช้ instanceof)
+            const sigField = annotationManager.getFieldManager().getField('Executive_Signature');
+            const widget   = sigField?.widgets?.[0];
+
+            console.log('[Approve] sigField:', sigField, '| widget:', widget);
+
+            if (widget && widget.element) {
+                // ต้องใช้ iframeWindow.MouseEvent เพราะ element อยู่ใน iFrame
+                const iframe = document.querySelector('#viewer iframe');
+                const iwin   = iframe?.contentWindow;
+                if (iwin) {
+                    const evt = new iwin.MouseEvent('click', {
+                        bubbles: true, cancelable: true, view: iwin });
+                    widget.element.dispatchEvent(evt);
+                    console.log('[Approve] Dispatched MouseEvent to widget element inside iFrame');
+                } else {
+                    widget.element.click();
+                }
+            } else {
+                // Fallback: ค้นหา button ใน iFrame DOM โดยตรง
+                const iframe = document.querySelector('#viewer iframe');
+                const iframeDoc = iframe?.contentDocument;
+                const el = iframeDoc?.querySelector('[data-field-name="Executive_Signature"]')
+                        || iframeDoc?.querySelector('.signature-widget-button')
+                        || iframeDoc?.querySelector('button.widget');
+                if (el) {
+                    el.click();
+                    console.log('[Approve] Clicked iFrame DOM element:', el);
+                } else {
+                    console.warn('[Approve] Cannot find widget element — กรุณาคลิกกล่องเซ็นเองก่อน');
+                    status.textContent = "🖊️ กรุณาคลิกกล่อง \"Sign here\" แล้วเซ็น — ระบบจะ Approve อัตโนมัติ";
+                }
+            }
+        }
+
+        // ─── 5. Submit Approval to mock API ──────────────────────────────
+        async function submitApproval() {
+            const status = document.getElementById('status');
+            status.textContent = "⏳ Submitting approval...";
+
+            const res = await fetch('/api/approve', { method: 'POST' });
+            const data = await res.json();
+
+            console.log('[Approve] API Response:', data);
+
+            if (res.ok) {
+                status.textContent = `✅ Approved! (ref: ${data.approval_ref})`;
+                const approveBtn = document.getElementById('approve-btn');
+                approveBtn.textContent = "✅ Approved";
+                approveBtn.className   = "btn-approved";
+                approveBtn.disabled    = true;
+            } else {
+                status.textContent = "❌ Approval failed: " + data.message;
+            }
+        }
+    </script>
+</body>
+</html>

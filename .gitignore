@@ -142,3 +142,14 @@ dist
 .svelte-kit
 
 # End of https://www.toptal.com/developers/gitignore/api/node
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Generated files
+rvo_e2e_poc/space/
+rvo_e2e_poc/generated_report.pdf
