@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWC RVO E2E POC - Flow</title>
+    <script src="/lib/webviewer.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: sans-serif; background: #f4f4f9; }
+        .header {
+            padding: 12px 20px;
+            background: #002b49;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .header h2 { font-size: 18px; flex: 1; }
+        button {
+            padding: 8px 18px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-gen  { background: #ffc107; color: #000; }
+        .btn-gen:hover:not(:disabled)  { background: #e0a800; }
+        .btn-approve { background: #0d6efd; color: #fff; }
+        .btn-approve:hover:not(:disabled) { background: #0a58ca; }
+        .btn-save { background: #00b140; color: #fff; }
+        .btn-save:hover:not(:disabled) { background: #008a32; }
+        
+        #status { font-size: 13px; color: #cce; min-width: 200px; }
+        #viewer { width: 100%; height: calc(100vh - 56px); }
+        
+        .mode-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        .mode-preview { background: #6c757d; color: white; }
+        .mode-sign { background: #dc3545; color: white; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>RVO POC Flow</h2>
+        <span id="mode-display" class="mode-badge" style="display:none;"></span>
+        <span id="status">Click "Generate PDF" to start</span>
+        
+        <!-- Step 1: Generate -->
+        <button class="btn-gen" id="gen-btn" onclick="generatePDF()">1. Generate New PDF</button>
+        
+        <!-- Step 2: Approve (Switch to Signing Mode) -->
+        <button class="btn-approve" id="approve-btn" style="display:none;" onclick="enterSigningMode()">2. Approve</button>
+        
+        <!-- Step 3: Save and Approve (Finalize) -->
+        <button class="btn-save" id="save-btn" style="display:none;" onclick="saveAndApprove()">3. SAVE and Approve</button>
+    </div>
+    <div id="viewer"></div>
+
+    <script>
+        let wvInstance = null;
+        let annotationManager = null;
+
+        async function generatePDF() {
+            const btn = document.getElementById('gen-btn');
+            const status = document.getElementById('status');
+            btn.disabled = true;
+            status.textContent = "⏳ Generating PDF...";
+
+            const res = await fetch('/api/generate-pdf', { method: 'POST' });
+            if (!res.ok) {
+                status.textContent = "❌ Generation failed!";
+                btn.disabled = false;
+                return;
+            }
+
+            status.textContent = "✅ PDF ready. Previewing...";
+            btn.disabled = false;
+            initViewer(true); // Start in Read-Only (Preview) mode
+        }
+
+        function initViewer(readOnly) {
+            const viewerEl = document.getElementById('viewer');
+            viewerEl.innerHTML = "";
+            
+            // UI Toggle
+            document.getElementById('gen-btn').style.display = 'none';
+            document.getElementById('approve-btn').style.display = 'inline-block';
+            document.getElementById('save-btn').style.display = 'none';
+            
+            updateModeDisplay(readOnly ? 'Preview' : 'Signing');
+
+            WebViewer({
+                path: '/lib/public',
+                initialDoc: '/api/document',
+                fullAPI: true,
+                isReadOnly: readOnly
+            }, viewerEl).then(async instance => {
+                wvInstance = instance;
+                const { documentViewer, annotationManager: am } = instance.Core;
+                annotationManager = am;
+
+                if (readOnly) {
+                    console.log(">>> [LOCK] Enabling Read-Only Mode & Hiding Ribbons...");
+                    // 1. Lock annotations logic
+                    if (typeof am.enableReadOnlyMode === 'function') {
+                        am.enableReadOnlyMode();
+                    }
+                    // 2. Hide ALL tool ribbons/tabs
+                    instance.UI.disableElements(['ribbons', 'toolsHeader', 'annotationCommentPanel']);
+                }
+
+                documentViewer.addEventListener('documentLoaded', () => {
+                    document.getElementById('status').textContent = readOnly ? "👀 Preview Mode (Read Only)" : "🖊️ Signing Mode (Enabled)";
+                });
+            });
+        }
+
+        function updateModeDisplay(mode) {
+            const el = document.getElementById('mode-display');
+            el.style.display = 'inline-block';
+            el.textContent = mode;
+            el.className = 'mode-badge ' + (mode === 'Preview' ? 'mode-preview' : 'mode-sign');
+        }
+
+        function enterSigningMode() {
+            if (!wvInstance || !annotationManager) return;
+            
+            console.log(">>> [FLOW] User clicked APPROVE. Switching to Signing Mode...");
+            
+            // Switch UI Buttons
+            document.getElementById('approve-btn').style.display = 'none';
+            document.getElementById('save-btn').style.display = 'inline-block';
+            document.getElementById('status').textContent = "🖊️ Signing Mode Enabled";
+            updateModeDisplay('Signing');
+
+            // 1. Unlock logic
+            if (typeof annotationManager.disableReadOnlyMode === 'function') {
+                annotationManager.disableReadOnlyMode();
+            }
+            
+            // 2. Show tool ribbons/tabs back
+            wvInstance.UI.enableElements(['ribbons', 'toolsHeader', 'annotationCommentPanel']);
+            
+            // 3. Set to default mode to be sure
+            if (typeof wvInstance.UI.setMode === 'function') {
+                wvInstance.UI.setMode('default');
+            }
+
+            console.log(">>> [FLOW] Ribbons enabled. WebViewer is now in SIGNING MODE.");
+        }
+
+        async function saveAndApprove() {
+            const btn = document.getElementById('save-btn');
+            const status = document.getElementById('status');
+            if (!annotationManager) return;
+
+            btn.disabled = true;
+            status.textContent = "⏳ Saving and Approving...";
+
+            // 1. Export XFDF (ลายเซ็น)
+            const xfdfString = await annotationManager.exportAnnotations();
+
+            console.group('🚀 [FLOW] FINAL APPROVE & SAVE');
+            console.log('--- Mock Data to Backend ---');
+            console.log('XFDF Payload:', xfdfString.substring(0, 100) + "...");
+            console.log('Status: APPROVED');
+            console.groupEnd();
+
+            // 2. ส่งข้อมูลจริงไปหลังบ้าน
+            try {
+                await fetch('/api/xfdf', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ xfdf_payload: xfdfString })
+                });
+
+                const res = await fetch('/api/approve', { method: 'POST' });
+                const data = await res.json();
+                
+                status.textContent = "✅ ALL DONE! Document Approved & Saved.";
+                btn.textContent = "✅ Completed";
+                
+                alert("บันทึกข้อมูลและอนุมัติเรียบร้อยแล้ว!\nRef: " + data.approval_ref);
+
+            } catch (err) {
+                console.error("Save failed", err);
+                status.textContent = "❌ Error occurred";
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

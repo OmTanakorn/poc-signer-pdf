@@ -16,7 +16,7 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Mount Apryse WebViewer from node_modules
-lib_path = "../node_modules/@pdftron/webviewer"
+lib_path = "node_modules/@pdftron/webviewer"
 if os.path.exists(lib_path):
     app.mount("/lib", StaticFiles(directory=lib_path), name="lib")
 
@@ -47,11 +47,11 @@ def embed_signature_field(pdf_path: str):
         NameObject("/FT"):      NameObject("/Sig"),
         NameObject("/T"):       create_string_object("Executive_Signature"),
         # พิกัด PDF (bottom-left origin) — A4: 595x842pt, margin 2cm≈57pt
-        # ชิดซ้าย: x1=57 (left margin), x2=222 (กว้าง 165pt)
+        # ชิดซ้าย: x1=57+20=77 (shifted right), x2=222+20=242
         # บนเส้น sig-line (กลางหน้า): y1=480, y2=520
         NameObject("/Rect"):    ArrayObject([
-            NumberObject(57),  NumberObject(480),
-            NumberObject(222), NumberObject(520),
+            NumberObject(77),  NumberObject(480),
+            NumberObject(242), NumberObject(520),
         ]),
         NameObject("/F"):       NumberObject(4),
         NameObject("/P"):       writer.pages[0].indirect_reference,
