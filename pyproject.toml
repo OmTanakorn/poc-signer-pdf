@@ -11,4 +11,5 @@ dependencies = [
     "requests>=2.33.1",
     "uvicorn>=0.42.0",
     "weasyprint>=68.1",
+    "python-dotenv>=1.0",
 ]

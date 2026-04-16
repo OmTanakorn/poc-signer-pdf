@@ -1,11 +1,14 @@
 import os
 import requests
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from weasyprint import HTML
 from jinja2 import Environment, FileSystemLoader
 from pypdf import PdfWriter, PdfReader
+
+load_dotenv()
 from pypdf.generic import (
     ArrayObject,
     DictionaryObject,
@@ -87,6 +90,17 @@ def embed_signature_field(pdf_path: str):
     # เขียนทับไฟล์เดิม
     with open(pdf_path, "wb") as f:
         writer.write(f)
+
+
+# ---------------------------------------------------------
+# 0. API: Public Client Config (env vars safe to expose)
+# ---------------------------------------------------------
+@app.get("/api/config")
+async def get_config():
+    return {
+        "PDFTRON_SERVER_URL": os.getenv("PDFTRON_SERVER_URL", ""),
+        "PDFTRON_LICENSE": os.getenv("PDFTRON_LICENSE", ""),
+    }
 
 
 # ---------------------------------------------------------
@@ -266,6 +280,15 @@ async def save_xfdf(request: Request):
 @app.get("/approve", response_class=HTMLResponse)
 async def serve_approve():
     with open("static/approve.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+
+# ---------------------------------------------------------
+# 5b. Serve New Flow Page
+# ---------------------------------------------------------
+@app.get("/new-flow", response_class=HTMLResponse)
+async def serve_new_flow():
+    with open("static/new-flow.html", "r", encoding="utf-8") as f:
         return f.read()
 
 

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AWC RVO E2E POC - Flow</title>
+    <title>AWC RVO E2E POC - New Flow</title>
     <script src="/lib/webviewer.min.js"></script>
     <style>
         * {
@@ -74,7 +74,7 @@
             height: 24px;
             border-radius: 50%;
             background: #dde1e7;
-            color: #6b7280;
+            color: #9aa3b0;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -366,7 +366,7 @@
 
     <!-- Header -->
     <div class="header">
-        <h2>RVO POC Flow</h2>
+        <h2>RVO POC — New Signing Flow</h2>
     </div>
 
     <!-- Step Bar -->
@@ -394,7 +394,7 @@
                 <h3>Generate RVO Document</h3>
                 <p>ระบุจำนวนเงิน RVO แล้วกด Generate เพื่อสร้าง PDF</p>
                 <div class="input-group">
-                    <label for="amount-input">จำนวนเงิน (Amount)</label>
+                    <label>จำนวนเงิน (Amount)</label>
                     <input type="text" id="amount-input" value="1,500,000.00" placeholder="e.g. 1,500,000.00">
                 </div>
                 <button class="btn-warning btn-lg" id="gen-btn" onclick="generatePDF()">
@@ -460,16 +460,6 @@
     </div>
 
     <script>
-        // ── Config (loaded from server env) ───────────────────────
-        let appConfig = {};
-
-        async function loadConfig() {
-            const res = await fetch('/api/config');
-            appConfig = await res.json();
-        }
-
-        const configReady = loadConfig();
-
         // ── State ──────────────────────────────────────────────
         let wvInstance2 = null;
         let wvInstance4 = null;
@@ -521,8 +511,7 @@
         }
 
         // ── Step 2: Preview Viewer (Read-Only) ─────────────────
-        async function initPreviewViewer() {
-            await configReady;
+        function initPreviewViewer() {
             const el = document.getElementById('viewer-2');
             el.innerHTML = '';
             document.getElementById('status-2').textContent = 'Loading document...';
@@ -531,8 +520,6 @@
             WebViewer({
                 path: '/lib/public',
                 initialDoc: '/api/document',
-                webviewerServerURL: appConfig.PDFTRON_SERVER_URL,
-                licenseKey: appConfig.PDFTRON_LICENSE,
                 fullAPI: true,
                 isReadOnly: true
             }, el).then(instance => {
@@ -543,11 +530,7 @@
                 if (typeof am.enableReadOnlyMode === 'function') {
                     am.enableReadOnlyMode();
                 }
-                instance.UI.disableElements([
-                    'ribbons', 'toolsHeader', 'annotationCommentPanel',
-                    'toolbarGroup-Annotate', 'toolbarGroup-Shapes', 'toolbarGroup-Insert',
-                    'toolbarGroup-Measure', 'toolbarGroup-Edit', 'toolbarGroup-FillAndSign'
-                ]);
+                instance.UI.disableElements(['ribbons', 'toolsHeader', 'annotationCommentPanel', 'toolbarGroup-Annotate', 'toolbarGroup-Shapes', 'toolbarGroup-Insert', 'toolbarGroup-Measure', 'toolbarGroup-Edit', 'toolbarGroup-FillAndSign']);
 
                 documentViewer.addEventListener('documentLoaded', () => {
                     document.getElementById('status-2').textContent = 'Document ready — Read-Only';
@@ -649,6 +632,7 @@
             try {
                 const sigDataUrl = canvas.toDataURL('image/png');
 
+                // Find signature field position via Apryse field manager
                 const fieldManager = annotationManager2.getFieldManager();
                 const field = fieldManager.getField('Executive_Signature');
 
@@ -664,8 +648,10 @@
                     stamp.Width = rect.x2 - rect.x1;
                     stamp.Height = rect.y2 - rect.y1;
                 } else {
+                    // Fallback coords if field not found (Apryse top-left origin on A4)
+                    // PDF coords: x1=370, y1=102, x2=480, y2=152  → A4 height=842 → Apryse y = 842-pdfY
                     stamp.X = 370;
-                    stamp.Y = 842 - 152;
+                    stamp.Y = 842 - 152; // 690
                     stamp.Width = 110;
                     stamp.Height = 50;
                 }
@@ -674,6 +660,7 @@
                 annotationManager2.addAnnotation(stamp);
                 annotationManager2.redrawAnnotation(stamp);
 
+                // Export & save XFDF
                 const xfdfString = await annotationManager2.exportAnnotations();
                 await fetch('/api/xfdf', {
                     method: 'POST',
@@ -681,6 +668,7 @@
                     body: JSON.stringify({ xfdf_payload: xfdfString })
                 });
 
+                // Approve
                 const approveRes = await fetch('/api/approve', { method: 'POST' });
                 const approveData = await approveRes.json();
 
@@ -697,8 +685,7 @@
         }
 
         // ── Step 4: View Signed PDF ─────────────────────────────
-        async function initSignedViewer(approvalRef) {
-            await configReady;
+        function initSignedViewer(approvalRef) {
             const el = document.getElementById('viewer-4');
             el.innerHTML = '';
             document.getElementById('status-4').textContent = 'Loading signed document...';
@@ -706,8 +693,6 @@
             WebViewer({
                 path: '/lib/public',
                 initialDoc: '/api/document',
-                webviewerServerURL: appConfig.PDFTRON_SERVER_URL,
-                licenseKey: appConfig.PDFTRON_LICENSE,
                 fullAPI: true,
                 isReadOnly: true
             }, el).then(instance => {
@@ -717,13 +702,10 @@
                 if (typeof am.enableReadOnlyMode === 'function') {
                     am.enableReadOnlyMode();
                 }
-                instance.UI.disableElements([
-                    'ribbons', 'toolsHeader', 'annotationCommentPanel',
-                    'toolbarGroup-Annotate', 'toolbarGroup-Shapes', 'toolbarGroup-Insert',
-                    'toolbarGroup-Measure', 'toolbarGroup-Edit', 'toolbarGroup-FillAndSign'
-                ]);
+                instance.UI.disableElements(['ribbons', 'toolsHeader', 'annotationCommentPanel', 'toolbarGroup-Annotate', 'toolbarGroup-Shapes', 'toolbarGroup-Insert', 'toolbarGroup-Measure', 'toolbarGroup-Edit', 'toolbarGroup-FillAndSign']);
 
                 documentViewer.addEventListener('documentLoaded', async () => {
+                    // Load saved XFDF (contains the stamp annotation)
                     try {
                         const xfdfRes = await fetch('/api/xfdf');
                         const xfdfData = await xfdfRes.json();
