@@ -1,45 +1,584 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RVO Coversheet - Asset World Corp PLC</title>
     <style>
-        @page { size: A4; margin: 2cm; }
-        body { font-family: sans-serif; padding: 20px; }
-        h1 { color: #002b49; border-bottom: 2px solid #002b49; padding-bottom: 10px; }
-        .data-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        .data-table th, .data-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-        .data-table th { background: #f0f4f8; }
-        .signature-box {
-            position: absolute;
-            bottom: 0;
-            right: 50px;
-            width: 150pt;
-            text-align: center;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        .sig-line {
-            display: inline-block;
+
+        :root {
+            --bg-primary: #FFFFFF;
+            --text-primary: #282828;
+            --border-primary: #E6E6E6;
+            --border-dark: #D7D7D7;
+            --bg-card: #F5F5F5;
+            --font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        @page {
+            size: A4;
+            margin: 0;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background: var(--bg-primary);
+            margin: 0;
+            padding: 0;
+            width: 210mm;
+            height: 297mm;
+        }
+
+        .rvo-container {
+            width: 210mm;
+            height: 297mm;
+            background: var(--bg-primary);
+            margin: 0;
+            padding: 14px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .rvo-section-stretch {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .rvo-section-stretch .rvo-fields {
+            flex: 1;
+        }
+
+        /* Header */
+        .rvo-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-primary);
+        }
+
+        .rvo-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .rvo-date {
+            font-size: 8px;
+            font-weight: 400;
+            color: var(--text-primary);
+        }
+
+        .rvo-company {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .rvo-subtitle {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+        }
+
+        /* Section Container */
+        .rvo-section {
+            border: 1px solid var(--border-dark);
+            border-radius: 4px;
+            margin-bottom: 8px;
+            overflow: hidden;
+            page-break-inside: avoid;
+        }
+
+        .rvo-section-header {
+            background: var(--bg-card);
+            padding: 5px 6px;
+            border-bottom: 1px solid var(--border-primary);
+            font-size: 8px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        /* Table/Row Styling */
+        .rvo-table {
             width: 100%;
-            border-bottom: 1px solid #000;
-            margin-bottom: 5pt;
-            height: 40pt;
+            border-collapse: collapse;
         }
-        .sig-label { font-size: 11pt; color: #444; }
+
+        .rvo-table-row {
+            display: flex;
+            border-bottom: 1px solid var(--border-primary);
+            background: var(--bg-primary);
+        }
+
+        .rvo-table-row:last-child {
+            border-bottom: none;
+        }
+
+        .rvo-table-cell {
+            flex: 1;
+            padding: 4px 6px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border-right: 1px solid var(--border-primary);
+            font-size: 8px;
+            color: var(--text-primary);
+        }
+
+        .rvo-table-cell:last-child {
+            border-right: none;
+        }
+
+        .rvo-table-cell.half {
+            flex: 0 0 50%;
+        }
+
+        .rvo-cell-label {
+            font-weight: 700;
+            font-size: 8px;
+            margin-bottom: 2px;
+        }
+
+        .rvo-cell-value {
+            font-weight: 400;
+            font-size: 8px;
+            word-wrap: break-word;
+        }
+
+        /* Field Sections */
+        .rvo-fields {
+            padding: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .rvo-field {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .rvo-field-label {
+            font-weight: 700;
+            font-size: 8px;
+            color: var(--text-primary);
+        }
+
+        .rvo-field-row {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            font-size: 8px;
+        }
+
+        .rvo-input {
+            flex: 1;
+            border: none;
+            border-bottom: 1px solid var(--border-primary);
+            padding: 2px 0;
+            font-size: 8px;
+            font-family: var(--font-family);
+            color: var(--text-primary);
+            background: transparent;
+        }
+
+        /* Checkbox */
+        .rvo-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .rvo-checkbox-box {
+            width: 10px;
+            height: 10px;
+            border: 1px solid var(--border-primary);
+            border-radius: 2px;
+            background: var(--bg-primary);
+            flex-shrink: 0;
+        }
+
+        .rvo-checkbox-box.checked {
+            background: var(--text-primary);
+        }
+
+        .rvo-checkbox-label {
+            font-size: 8px;
+            color: var(--text-primary);
+        }
+
+        /* Options Container */
+        .rvo-options-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .rvo-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 0 1 calc(33.33% - 7px);
+        }
+
+        /* Signature */
+        .rvo-signature-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            margin-top: 4px;
+        }
+
+        .rvo-signature-line {
+            width: 200px;
+            border-bottom: 1px solid var(--border-primary);
+            margin: 4px 0 2px;
+        }
+
+        .rvo-signature-name {
+            font-size: 8px;
+            color: var(--text-primary);
+            font-weight: 400;
+        }
+
+        /* Cost Row */
+        .rvo-cost-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            width: 100%;
+        }
+
+        /* Summary */
+        .rvo-summary-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            gap: 10px;
+        }
+
+        .rvo-summary-label {
+            font-weight: 700;
+            font-size: 8px;
+            flex: 0 1 auto;
+        }
+
+        .rvo-summary-value {
+            flex: 1;
+            border-bottom: 1px solid var(--border-primary);
+            padding: 2px 0;
+            font-size: 8px;
+            text-align: right;
+        }
+
+        /* Footer */
+        .rvo-footer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 4px;
+            margin-top: 8px;
+            font-size: 8px;
+            color: var(--text-primary);
+        }
+
+        @media print {
+            body { background: white; }
+            .rvo-container { width: 210mm; }
+        }
     </style>
 </head>
 <body>
-    <h1>AWC RVO Report</h1>
-    <table class="data-table">
-        <tr><th>RVO Number</th><td>{{ rvo_number }}</td></tr>
-        <tr><th>Project</th><td>{{ project_name }}</td></tr>
-        <tr><th>Amount</th><td>{{ amount }} THB</td></tr>
-        <tr><th>Carried Forward From last approved RVO Summary</th><td>{{ carried_forward }}</td></tr>
-        <tr><th>Total RVO Including this Approval</th><td>{{ total_rvo }}</td></tr>
-        <tr><th>Estimated Cost to Complete following this approval</th><td>{{ estimated_cost }}</td></tr>
-    </table>
+    <div class="rvo-container">
+        <!-- Header -->
+        <div class="rvo-header">
+            <span class="rvo-title">AWC PayStation</span>
+            <span class="rvo-date">{{ dateIssued }}</span>
+        </div>
 
-    <div class="signature-box">
-        <div class="sig-line"></div><br>
-        <span class="sig-label">Tanakorn Aphiwan<br>Authorized Executive</span>
+        <!-- Company & Doc Title -->
+        <div class="rvo-company">ASSET WORLD CORP PLC.</div>
+        <div class="rvo-subtitle">Requisition for Variation Order (RVO)</div>
+
+        <!-- PART I A: REQUEST INITIATION -->
+        <div class="rvo-section">
+            <div class="rvo-section-header">PART I A: REQUEST INITIATION</div>
+            <div class="rvo-table">
+                <div class="rvo-table-row">
+                    <div class="rvo-table-cell half">
+                        <span class="rvo-cell-label">Name of Project:</span>
+                        <span class="rvo-cell-value">{{ projectName }}</span>
+                    </div>
+                    <div class="rvo-table-cell half">
+                        <span class="rvo-cell-label">RVO No.:</span>
+                        <span class="rvo-cell-value">{{ rvoNumber }}</span>
+                    </div>
+                </div>
+                <div class="rvo-table-row">
+                    <div class="rvo-table-cell half">
+                        <span class="rvo-cell-label">Name of Contractor:</span>
+                        <span class="rvo-cell-value">{{ contractorName }}</span>
+                    </div>
+                    <div class="rvo-table-cell half">
+                        <span class="rvo-cell-label">Contract</span>
+                        <span class="rvo-cell-value">{{ contractId }}</span>
+                    </div>
+                </div>
+                <div class="rvo-table-row">
+                    <div class="rvo-table-cell">
+                        <span class="rvo-cell-label">Contract Description:</span>
+                        <span class="rvo-cell-value">{{ contractDescription }}</span>
+                    </div>
+                </div>
+                <div class="rvo-table-row">
+                    <div class="rvo-table-cell">
+                        <span class="rvo-cell-label">Description of RVO:</span>
+                        <span class="rvo-cell-value">{{ rvoDescription }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reason for Variation -->
+            <div class="rvo-fields" style="border-top: 1px solid var(--border-primary); margin-top: 4px; padding-top: 4px;">
+                <div style="font-size: 8px; font-weight: 700;">Reason for variation (Full detail with drawing to be attached)</div>
+                <div class="rvo-options-group">
+                    <div class="rvo-option">
+                        <div class="rvo-checkbox">
+                            <div class="rvo-checkbox-box {% if reasons.designRelated %}checked{% endif %}"></div>
+                            <span class="rvo-checkbox-label">Design Related Changes</span>
+                        </div>
+                    </div>
+                    <div class="rvo-option">
+                        <div class="rvo-checkbox">
+                            <div class="rvo-checkbox-box {% if reasons.materialSpecs %}checked{% endif %}"></div>
+                            <span class="rvo-checkbox-label">Material & Specification</span>
+                        </div>
+                    </div>
+                    <div class="rvo-option">
+                        <div class="rvo-checkbox">
+                            <div class="rvo-checkbox-box {% if reasons.awcRequirement %}checked{% endif %}"></div>
+                            <span class="rvo-checkbox-label">AWC's Requirement</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="rvo-options-group">
+                    <div class="rvo-option">
+                        <div class="rvo-checkbox">
+                            <div class="rvo-checkbox-box"></div>
+                            <span class="rvo-checkbox-label">Authorities Requirement</span>
+                        </div>
+                    </div>
+                    <div class="rvo-option">
+                        <div class="rvo-checkbox">
+                            <div class="rvo-checkbox-box"></div>
+                            <span class="rvo-checkbox-label">Construction Method</span>
+                        </div>
+                    </div>
+                    <div class="rvo-option">
+                        <div class="rvo-checkbox">
+                            <div class="rvo-checkbox-box"></div>
+                            <span class="rvo-checkbox-label">Site Condition</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="rvo-options-group">
+                    <div class="rvo-option">
+                        <div class="rvo-checkbox">
+                            <div class="rvo-checkbox-box"></div>
+                            <span class="rvo-checkbox-label">Schedules & Phasing</span>
+                        </div>
+                    </div>
+                    <div class="rvo-option">
+                        <div class="rvo-checkbox">
+                            <div class="rvo-checkbox-box"></div>
+                            <span class="rvo-checkbox-label">Cost Optimization</span>
+                        </div>
+                    </div>
+                    <div class="rvo-option">
+                        <div class="rvo-checkbox">
+                            <div class="rvo-checkbox-box"></div>
+                            <span class="rvo-checkbox-label">Owner Requirement</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="rvo-options-group">
+                    <div class="rvo-option">
+                        <div class="rvo-checkbox">
+                            <div class="rvo-checkbox-box"></div>
+                            <span class="rvo-checkbox-label">Scope & Requirement</span>
+                        </div>
+                    </div>
+                    <div class="rvo-option">
+                        <div class="rvo-checkbox">
+                            <div class="rvo-checkbox-box"></div>
+                            <span class="rvo-checkbox-label">Others (specify)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rvo-field-row" style="margin-top: 4px;">
+                    <span style="font-weight: 700; font-size: 8px; min-width: 140px;">Require back-charge</span>
+                    <input type="text" class="rvo-input" placeholder="M/S" value="{{ backchargeParties }}">
+                    <span style="font-weight: 700; font-size: 8px; margin-left: 8px; min-width: 60px;">RVO No:</span>
+                    <input type="text" class="rvo-input" value="{{ backchargeRvoNumber }}">
+                </div>
+            </div>
+
+            <!-- Initiator & Date -->
+            <div class="rvo-table" style="margin-top: 4px; border-top: 1px solid var(--border-primary); padding-top: 4px;">
+                <div class="rvo-table-row" style="border: none;">
+                    <div class="rvo-table-cell half" style="border: none; padding-top: 0;">
+                        <span class="rvo-cell-label">Initiated by:</span>
+                        <div class="rvo-signature-group">
+                            <div class="rvo-signature-line"></div>
+                            <span class="rvo-signature-name">{{ initiatedByName }}</span>
+                        </div>
+                    </div>
+                    <div class="rvo-table-cell half" style="border: none; padding-top: 0;">
+                        <span class="rvo-cell-label">Date:</span>
+                        <span class="rvo-cell-value">{{ initiatedDate }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PART I B: TIME IMPLICATION AND INDICATIVE SCHEDULE -->
+        <div class="rvo-section">
+            <div class="rvo-section-header">PART I B: TIME IMPLICATION AND INDICATIVE SCHEDULE</div>
+            <div class="rvo-fields">
+                <div class="rvo-field-row">
+                    <span style="font-weight: 700; font-size: 8px; min-width: 120px;">Time on Critical Path:</span>
+                    <input type="text" class="rvo-input" value="{{ timeImplication }}" style="flex: 0 0 40px;">
+                    <span style="font-size: 8px; margin-left: 4px;">Days</span>
+                </div>
+                <div class="rvo-field">
+                    <div style="font-size: 8px; font-weight: 700;">Indicative schedule:</div>
+                    <textarea class="rvo-input" style="min-height: 20px; padding: 2px;">{{ indicativeSchedule }}</textarea>
+                </div>
+            </div>
+            <div class="rvo-table" style="margin-top: 4px; border-top: 1px solid var(--border-primary); padding-top: 4px;">
+                <div class="rvo-table-row" style="border: none;">
+                    <div class="rvo-table-cell half" style="border: none;">
+                        <span class="rvo-cell-label">Prepared by:</span>
+                        <div class="rvo-signature-group">
+                            <div class="rvo-signature-line"></div>
+                            <span class="rvo-signature-name" style="font-size: 7px;">{{ preparedByName }}</span>
+                        </div>
+                    </div>
+                    <div class="rvo-table-cell half" style="border: none;">
+                        <span class="rvo-cell-label">Date:</span>
+                        <span class="rvo-cell-value">{{ preparedDate }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PART I C: COST IMPLICATION -->
+        <div class="rvo-section">
+            <div class="rvo-section-header">PART I C: COST IMPLICATION</div>
+            <div class="rvo-fields">
+                <div class="rvo-field-row">
+                    <span style="font-weight: 700; font-size: 8px; min-width: 80px;">Spec/Bill Ref:</span>
+                    <input type="text" class="rvo-input" value="{{ specBillRef }}">
+                </div>
+
+                <!-- Cost Estimation Grid -->
+                <div style="display: flex; gap: 8px; font-size: 8px;">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 700; font-size: 8px; margin-bottom: 4px;">Estimated by QS</div>
+                        <div class="rvo-cost-row" style="gap: 6px;">
+                            <label style="display: flex; align-items: center; gap: 3px; flex: 1;">
+                                <input type="radio" name="estimateAddition" value="addition">
+                                <span style="font-size: 8px;">Add</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 3px; flex: 1;">
+                                <input type="radio" name="estimateAddition" value="omission">
+                                <span style="font-size: 8px;">Omit</span>
+                            </label>
+                            <input type="text" class="rvo-input" placeholder="฿" style="flex: 1; max-width: 80px;" value="{{ estimateQsAmount }}">
+                        </div>
+                        <div style="text-align: right; font-size: 7px; margin-top: 2px;">Baht (excl. VAT)</div>
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: 700; font-size: 8px; margin-bottom: 4px;">Estimated by G&amp;C</div>
+                        <div class="rvo-cost-row" style="gap: 6px;">
+                            <label style="display: flex; align-items: center; gap: 3px; flex: 1;">
+                                <input type="radio" name="estimateGcAddition" value="addition">
+                                <span style="font-size: 8px;">Add</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 3px; flex: 1;">
+                                <input type="radio" name="estimateGcAddition" value="omission">
+                                <span style="font-size: 8px;">Omit</span>
+                            </label>
+                            <input type="text" class="rvo-input" placeholder="฿" style="flex: 1; max-width: 80px;" value="{{ estimateGcAmount }}">
+                        </div>
+                        <div style="text-align: right; font-size: 7px; margin-top: 2px;">Baht (excl. VAT)</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Approval Signatures -->
+            <div style="display: flex; gap: 6px; margin-top: 6px; padding: 0 4px 4px;">
+                <div style="flex: 1; padding: 4px; border: 1px solid var(--border-primary); text-align: center;">
+                    <div class="rvo-signature-group">
+                        <div class="rvo-signature-line" style="width: 80px;"></div>
+                        <span style="font-size: 7px;">QS: {{ approverQsName }}</span>
+                        <span style="font-size: 7px;">{{ approverQsDate }}</span>
+                    </div>
+                </div>
+                <div style="flex: 1; padding: 4px; border: 1px solid var(--border-primary); text-align: center;">
+                    <div class="rvo-signature-group">
+                        <div class="rvo-signature-line" style="width: 80px;"></div>
+                        <span style="font-size: 7px;">G&amp;C: {{ approverGcName }}</span>
+                        <span style="font-size: 7px;">{{ approverGcDate }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PART I D: SUMMARY OF RVO FOR APPROVAL -->
+        <div class="rvo-section rvo-section-stretch">
+            <div class="rvo-section-header">PART I D: SUMMARY OF RVO FOR APPROVAL</div>
+            <div class="rvo-fields">
+                <div class="rvo-summary-row">
+                    <span class="rvo-summary-label">Contract Sum:</span>
+                    <span class="rvo-summary-value">{{ contractSum }} Baht (excl. VAT)</span>
+                </div>
+                <div class="rvo-summary-row" style="margin-top: 3px;">
+                    <span class="rvo-summary-label">Carried forward from last RVO:</span>
+                    <span class="rvo-summary-value">{{ carriedForward }} Baht (excl. VAT)</span>
+                </div>
+                <div class="rvo-summary-row" style="margin-top: 3px;">
+                    <span class="rvo-summary-label">Total RVO Including this Approval:</span>
+                    <span class="rvo-summary-value">{{ totalRvo }} Baht (excl. VAT)</span>
+                </div>
+                <div class="rvo-summary-row" style="margin-top: 3px;">
+                    <span class="rvo-summary-label">Est. Cost to Complete following this Approval:</span>
+                    <span class="rvo-summary-value">{{ estimatedCost }} Baht (excl. VAT)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="rvo-footer">
+            <span style="font-weight: 400;">Powered by</span>
+            <span style="font-weight: 700;">sitearound</span>
+        </div>
     </div>
 </body>
 </html>

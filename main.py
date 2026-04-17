@@ -17,6 +17,8 @@ from pypdf.generic import (
     create_string_object,
 )
 
+PDF_ANNOTS = "/Annots"
+
 app = FastAPI()
 
 # --- Mount Static Files ---
@@ -37,57 +39,53 @@ XFDF_FILE_PATH = os.path.join(SPACE_DIR, "signature.xfdf")
 env = Environment(loader=FileSystemLoader("templates"))
 
 
+def _make_sig_widget(name: str, rect: list, page_ref) -> DictionaryObject:
+    return DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Annot"),
+            NameObject("/Subtype"): NameObject("/Widget"),
+            NameObject("/FT"): NameObject("/Sig"),
+            NameObject("/T"): create_string_object(name),
+            NameObject("/Rect"): ArrayObject([NumberObject(v) for v in rect]),
+            NameObject("/F"): NumberObject(4),
+            NameObject("/P"): page_ref,
+        }
+    )
+
+
 def embed_signature_field(pdf_path: str):
     """
-    Post-process a WeasyPrint PDF to embed an AcroForm Signature Widget.
-    Coordinates (PDF units, bottom-left origin): rect = [x1, y1, x2, y2]
-    A4 page = 595 x 842 pt — วางกล่องขวาล่าง (ห่างจากล่าง 80-140 pt)
+    Embed two AcroForm Signature Widgets over the QS and G&C approval boxes in PART I C.
+    Coordinates measured via WeasyPrint layout (PDF pts, bottom-left origin, A4 595x842pt):
+      QS  box: x1=11, y1=302, x2=292, y2=335
+      G&C box: x1=298, y1=302, x2=578, y2=335
     """
     reader = PdfReader(pdf_path)
     writer = PdfWriter()
     writer.clone_reader_document_root(reader)
 
-    # สร้าง Widget Annotation สำหรับ Signature field
-    sig_widget = DictionaryObject(
-        {
-            NameObject("/Type"): NameObject("/Annot"),
-            NameObject("/Subtype"): NameObject("/Widget"),
-            NameObject("/FT"): NameObject("/Sig"),
-            NameObject("/T"): create_string_object("Executive_Signature"),
-            # พิกัด PDF (bottom-left origin) — A4: 595x842pt, margin 2cm≈57pt
-            # กว้างกล่อง (150pt), ขยับจากขวาคอนเทนต์ 50px (37.5pt) + คอนเทนต์มีผลของ padding body
-            # x2 = 486 (อ้างอิงจากรอบที่ 200pt ที่เคยล้นดำ ซึ่งเส้นอยู่ประมาณ 486), x1 = 486 - 150 = 336
-            # ขอบล่าง (y1 = 88), สูง 40pt (y2=128)
-            NameObject("/Rect"): ArrayObject(
-                [
-                    NumberObject(370),
-                    NumberObject(110 - 8),
-                    NumberObject(480),
-                    NumberObject(160 - 8),
-                ]
-            ),
-            NameObject("/F"): NumberObject(4),
-            NameObject("/P"): writer.pages[0].indirect_reference,
-        }
-    )
+    page_ref = writer.pages[0].indirect_reference
 
-    # เพิ่ม widget เข้าไปใน indirect objects และผูกกับหน้าแรก
-    widget_ref = writer._add_object(sig_widget)
+    qs_widget = _make_sig_widget("QS_Signature", [11, 302, 292, 335], page_ref)
+    gc_widget = _make_sig_widget("GC_Signature", [298, 302, 578, 335], page_ref)
+
+    qs_ref = writer._add_object(qs_widget)
+    gc_ref = writer._add_object(gc_widget)
+
     page = writer.pages[0]
-    if "/Annots" not in page:
-        page[NameObject("/Annots")] = ArrayObject()
-    page[NameObject("/Annots")].append(widget_ref)
+    if PDF_ANNOTS not in page:
+        page[NameObject(PDF_ANNOTS)] = ArrayObject()
+    page[NameObject(PDF_ANNOTS)].append(qs_ref)
+    page[NameObject(PDF_ANNOTS)].append(gc_ref)
 
-    # สร้าง AcroForm ใน PDF root
     acro_form = DictionaryObject(
         {
-            NameObject("/Fields"): ArrayObject([widget_ref]),
-            NameObject("/SigFlags"): NumberObject(3),  # SignaturesExist + AppendOnly
+            NameObject("/Fields"): ArrayObject([qs_ref, gc_ref]),
+            NameObject("/SigFlags"): NumberObject(3),
         }
     )
     writer._root_object[NameObject("/AcroForm")] = acro_form
 
-    # เขียนทับไฟล์เดิม
     with open(pdf_path, "wb") as f:
         writer.write(f)
 
@@ -208,13 +206,48 @@ async def generate_pdf(request: Request):
         f"[CALCULATION] Estimated Cost Formula: Total RVO ({total_rvo_val:,.2f}) + PO Net Price ({sum_po:,.2f}) = {estimated_cost_val:,.2f}"
     )
 
+    import datetime as dt
+
+    today = dt.date.today().strftime("%d/%m/%Y")
+
     data = {
-        "rvo_number": "RVO-2026-9999",
-        "project_name": "AWC Asiatique Expansion",
-        "amount": amount,
-        "carried_forward": carried_forward_str,
-        "total_rvo": f"{total_rvo_val:,.2f}",
-        "estimated_cost": f"{estimated_cost_val:,.2f}",
+        # Header
+        "dateIssued": today,
+        # PART I A
+        "projectName": "AWC Asiatique Expansion",
+        "rvoNumber": "RVO-2026-9999",
+        "contractorName": "บริษัท ตัวอย่าง จำกัด",
+        "contractId": "4100000931",
+        "contractDescription": "งานก่อสร้างโครงการ AWC Asiatique Expansion",
+        "rvoDescription": f"เพิ่มงาน variation ตามที่ระบุ มูลค่า {amount} บาท",
+        "reasons": {
+            "designRelated": False,
+            "materialSpecs": False,
+            "awcRequirement": True,
+        },
+        "backchargeParties": "",
+        "backchargeRvoNumber": "",
+        "initiatedByName": "Project Manager",
+        "initiatedDate": today,
+        # PART I B
+        "timeImplication": "0",
+        "indicativeSchedule": "-",
+        "preparedByName": "QS Engineer",
+        "preparedDate": today,
+        # PART I C
+        "specBillRef": "-",
+        "costSchedule": "-",
+        "estimateQsAmount": amount,
+        "estimateGcAmount": amount,
+        "approverQsName": "QS Director",
+        "approverQsDate": today,
+        "approverGcName": "G&C Director",
+        "approverGcDate": today,
+        # PART I D
+        "contractSum": f"{sum_po:,.2f}",
+        "carriedForward": carried_forward_str,
+        "totalRvo": f"{total_rvo_val:,.2f}",
+        "estimatedCost": f"{estimated_cost_val:,.2f}",
     }
 
     template = env.get_template("report.html")
